@@ -43,14 +43,20 @@
     }
 
     async function onScanSuccess(qrMessage) {
-      document.getElementById('status').innerText = "Scanned QR Code: " + qrMessage;
+  document.getElementById('status').innerText = "Scanned QR Code: " + qrMessage;
 
-      if (!accessToken) {
-        authenticateSpotify();
-      } else {
-        playSpotifyTrack(qrMessage);
-      }
+  if (qrMessage.includes("open.spotify.com/track/")) {
+    if (!accessToken) {
+      authenticateSpotify();
+      sessionStorage.setItem("scannedUrl", qrMessage); // Save temporarily
+    } else {
+      playSpotifyTrack(qrMessage);
     }
+  } else {
+    document.getElementById('status').innerText = "❌ Not a Spotify Track Link.";
+  }
+}
+
 
     function authenticateSpotify() {
       const scopes = "user-modify-playback-state streaming";
@@ -99,6 +105,12 @@
         window.history.replaceState({}, document.title, "/"); // Clean URL
         document.getElementById('status').innerText = "✅ Spotify Authenticated. Ready to scan!";
       }
+      const scannedUrl = sessionStorage.getItem("scannedUrl");
+      if (scannedUrl && accessToken) {
+      playSpotifyTrack(scannedUrl);
+      sessionStorage.removeItem("scannedUrl");
+}
+
 
       startQRScanner();
     };
