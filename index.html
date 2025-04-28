@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Spotify Auto Player</title>
+  <script src="https://unpkg.com/html5-qrcode"></script> <!-- QR Scanner -->
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin-top: 50px;
+    }
+    #qr-reader {
+      width: 300px;
+      margin: auto;
+    }
+    button {
+      margin-top: 20px;
+      padding: 10px 20px;
+      font-size: 18px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Spotify QR Auto-Player</h1>
+  <div id="qr-reader"></div>
+  <div id="status"></div>
+
+  <script>
+    const clientId = "cca7f9ce15254ef9b62e56195234eb2a"; // <-- Replace this!
+    const redirectUri = "https://yourdomain.com/callback.html";
+    let accessToken = "";
+
+    // Start QR Code scanner
+    function startQRScanner() {
+      const qrScanner = new Html5QrcodeScanner(
+        "qr-reader",
+        { fps: 10, qrbox: 250 }
+      );
+
+      qrScanner.render(onScanSuccess);
+    }
+
+    async function onScanSuccess(qrMessage) {
+      document.getElementById('status').innerText = "Scanned QR Code: " + qrMessage;
+
+      if (!accessToken) {
+        authenticateSpotify();
+      } else {
+        playSpotifyTrack(qrMessage);
+      }
+    }
+
+    function authenticateSpotify() {
+      const scopes = "user-modify-playback-state streaming";
+      const authUrl = `https://accounts.spotify.com/authorize?client_id=${clientId}&response_type=token&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent(scopes)}`;
+      window.location.href = authUrl;
+    }
+
+    async function playSpotifyTrack(trackUrl) {
+      // Extract the track URI if it's a web link
+      let trackUri = "";
+
+      if (trackUrl.includes("open.spotify.com/track")) {
+        const trackId = trackUrl.split("/track/")[1].split("?")[0];
+        trackUri = `spotify:track:${trackId}`;
+      } else if (trackUrl.startsWith("spotify:track:")) {
+        trackUri = trackUrl;
+      } else {
+        alert("Invalid Spotify Code.");
+        return;
+      }
+
+      const response = await fetch("https://api.spotify.com/v1/me/player/play", {
+        method: "PUT",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ uris: [trackUri] })
+      });
+
+      if (response.status === 204) {
+        document.getElementById('status').innerText = "✅ Playing on your device!";
+      } else {
+        const error = await response.json();
+        console.error(error);
+        document.getElementById('status').innerText = "❌ Error: " + (error.error.message || "Unknown error");
+      }
+    }
+
+    // Handle redirect after Spotify login
+    window.onload = () => {
+      if (window.location.hash.includes("access_token")) {
+        const hash = window.location.hash.substring(1);
+        const params = new URLSearchParams(hash);
+        accessToken = params.get("access_token");
+        window.history.replaceState({}, document.title, "/"); // Clean URL
+        document.getElementById('status').innerText = "✅ Spotify Authenticated. Ready to scan!";
+      }
+
+      startQRScanner();
+    };
+  </script>
+
+</body>
+</html>
